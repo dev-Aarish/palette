@@ -1,0 +1,1068 @@
+/* ============================================================
+   palette — retro OS desktop
+   Strict monochrome. Design tokens per designhomepage.md §2.
+   Selection and focus are communicated by inversion, never color.
+   ============================================================ */
+
+@font-face {
+  font-family: 'Perfect DOS VGA 437';
+  src: url('/fonts/PerfectDOSVGA437.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  --black: #0a0a0a;
+  --charcoal: #2b2b2b;
+  --gray-dark: #555555;
+  --gray-mid: #8c8c8c;
+  --gray-light: #c9c9c9;
+  --off-white: #f2f0ea;
+  --white: #ffffff;
+
+  --font-pixel: 'Perfect DOS VGA 437', 'Silkscreen', 'VT323', monospace;
+  --font-ui: 'VT323', 'Perfect DOS VGA 437', monospace;
+  --font-mono: 'IBM Plex Mono', 'VT323', monospace;
+
+  --taskbar-h: 40px;
+  --titlebar-h: 26px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  color: var(--black);
+  background: var(--black);
+  overflow: hidden;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* The bitmap display face is only crisp at its native size (16px); disable
+   anti-aliasing just there so it reads sharp instead of distorted. */
+.pixel-crisp,
+.desktop-icon .label,
+.desktop-icon .icon-rename,
+.titlebar .t-title,
+.start-btn,
+.start-band,
+.swatch-name,
+.detail-title,
+.add-plus {
+  -webkit-font-smoothing: none;
+}
+
+::selection {
+  background: var(--black);
+  color: var(--white);
+}
+
+:focus-visible {
+  outline: 2px dotted var(--gray-light);
+  outline-offset: 1px;
+}
+
+input,
+textarea,
+select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ------------------------------------------------------------
+   Desktop base layer
+   ------------------------------------------------------------ */
+
+.desktop {
+  position: fixed;
+  inset: 0;
+  background-color: var(--black);
+  background-size: cover;
+  background-position: center;
+  image-rendering: pixelated;
+  overflow: hidden;
+}
+
+/* Imported photos are rendered clean at near-native resolution. */
+.desktop.photo {
+  image-rendering: auto;
+}
+
+.desktop.flash::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--white);
+  animation: flashout 170ms linear forwards;
+  pointer-events: none;
+}
+
+@keyframes flashout {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.04) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* ------------------------------------------------------------
+   Desktop icons
+   ------------------------------------------------------------ */
+
+.desktop-icon {
+  position: absolute;
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 2px;
+  color: var(--white);
+  touch-action: none;
+}
+
+.desktop-icon .glyph {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.9));
+}
+
+.desktop-icon .label {
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--white);
+  text-shadow: 1px 1px 0 var(--black);
+  padding: 2px 4px;
+  /* Wide enough for the longest label word ("Inspirations" ≈ 108px at 16px);
+     words wrap whole at spaces and are never split mid-word. */
+  max-width: 120px;
+  overflow-wrap: normal;
+}
+
+.desktop-icon:hover .label {
+  background: rgba(0, 0, 0, 0.55);
+  text-shadow: none;
+}
+
+.desktop-icon.selected .label {
+  background: var(--black);
+  color: var(--white);
+  text-shadow: none;
+}
+
+.desktop-icon.fly {
+  transition:
+    transform 320ms linear,
+    opacity 320ms linear;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.icon-rename {
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  color: var(--white);
+  background: var(--black);
+  border: 1px solid var(--white);
+  width: 120px;
+  padding: 2px 3px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------
+   Windows
+   ------------------------------------------------------------ */
+
+.window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border: 1px solid var(--black);
+  box-shadow: 4px 4px 0 var(--charcoal);
+  min-width: 280px;
+  min-height: 170px;
+}
+
+.window.maximized {
+  box-shadow: none;
+  border-width: 1px;
+}
+
+.titlebar {
+  height: var(--titlebar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 3px 0 5px;
+  background: var(--black);
+  color: var(--white);
+  touch-action: none;
+}
+
+.titlebar.inactive {
+  background: var(--gray-mid);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.14) 0 1px,
+    transparent 1px 4px
+  );
+  color: var(--gray-dark);
+}
+
+.titlebar .t-icon {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+}
+
+.titlebar .t-title {
+  flex: 1;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.t-btn {
+  width: 16px;
+  height: 14px;
+  padding: 0;
+  margin-left: 2px;
+  flex: none;
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow:
+    inset 1px 1px 0 var(--white),
+    inset -1px -1px 0 var(--gray-dark);
+  display: grid;
+  place-items: center;
+}
+
+.t-btn:active {
+  box-shadow:
+    inset 1px 1px 0 var(--gray-dark),
+    inset -1px -1px 0 var(--white);
+}
+
+.t-btn .g {
+  position: relative;
+  display: block;
+  width: 9px;
+  height: 9px;
+}
+
+.g-min::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  bottom: 1px;
+  width: 7px;
+  height: 2px;
+  background: var(--black);
+}
+
+.g-max {
+  border: 1px solid var(--black);
+  width: 8px;
+  height: 7px;
+}
+
+.g-close::before,
+.g-close::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  width: 1.5px;
+  height: 9px;
+  background: var(--black);
+}
+
+.g-close::before {
+  transform: rotate(45deg);
+}
+
+.g-close::after {
+  transform: rotate(-45deg);
+}
+
+.window-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--white);
+  padding: 12px 14px;
+}
+
+.resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 15px;
+  height: 15px;
+  cursor: nwse-resize;
+  border-top: 1px solid var(--gray-dark);
+  border-left: 1px solid var(--gray-dark);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--gray-mid) 0 2px,
+    var(--off-white) 2px 4px
+  );
+}
+
+/* ------------------------------------------------------------
+   Retro controls
+   ------------------------------------------------------------ */
+
+.btn {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow:
+    inset 1px 1px 0 var(--white),
+    inset -1px -1px 0 var(--gray-dark);
+  padding: 4px 16px;
+}
+
+.btn:active {
+  box-shadow:
+    inset 1px 1px 0 var(--gray-dark),
+    inset -1px -1px 0 var(--white);
+}
+
+.btn:disabled {
+  color: var(--gray-dark);
+  text-shadow: 1px 1px 0 var(--white);
+}
+
+.field {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+  background: var(--white);
+  border: 1px solid var(--black);
+  box-shadow: inset 1px 1px 0 var(--gray-mid);
+  padding: 3px 8px;
+}
+
+.field:focus {
+  outline: none;
+  box-shadow:
+    inset 1px 1px 0 var(--gray-mid),
+    0 0 0 1px var(--black);
+}
+
+input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--black);
+}
+
+select.field {
+  padding: 1px 4px;
+}
+
+/* ------------------------------------------------------------
+   Window content pieces
+   ------------------------------------------------------------ */
+
+.para {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+}
+
+.sys-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 17px;
+}
+
+.sys-table td {
+  padding: 3px 10px 3px 0;
+  vertical-align: top;
+}
+
+.sys-table td:first-child {
+  color: var(--gray-dark);
+  white-space: nowrap;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--black);
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow:
+    inset 1px 1px 0 var(--white),
+    inset -1px -1px 0 var(--gray-dark);
+  padding: 1px 9px 1px;
+}
+
+.win-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--gray-light);
+  margin-bottom: 10px;
+}
+
+.win-status {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--gray-dark);
+}
+
+/* Inspirations — two-pane explorer */
+.split {
+  display: flex;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+.list-pane {
+  width: 40%;
+  min-width: 150px;
+  border: 1px solid var(--black);
+  box-shadow: inset 1px 1px 0 var(--gray-mid);
+  background: var(--white);
+  overflow: auto;
+}
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.entry-row:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.entry-row.active {
+  background: var(--black);
+  color: var(--white);
+}
+
+.detail-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  overflow: auto;
+}
+
+.detail-title {
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.detail-sub {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--gray-dark);
+  margin-top: -6px;
+}
+
+.detail-body {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* Wallpaper swatches */
+/* Fluid: columns shrink and wrap (4-up, then 3/2-up) as the window narrows,
+   instead of overflowing — the 1fr-auto-min trap is avoided with minmax(0). */
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.swatch {
+  position: relative;
+  border: 1px solid var(--black);
+  padding: 3px;
+  background: var(--gray-light);
+  box-shadow:
+    inset 1px 1px 0 var(--white),
+    inset -1px -1px 0 var(--gray-dark);
+}
+
+.swatch-main {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.swatch img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  object-fit: cover;
+  image-rendering: pixelated;
+  background: var(--black);
+}
+
+.swatch.selected {
+  box-shadow:
+    inset 1px 1px 0 var(--gray-dark),
+    inset -1px -1px 0 var(--white);
+  background: var(--gray-mid);
+}
+
+.swatch .swatch-name {
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  color: var(--black);
+  padding: 3px 2px 1px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swatch.selected .swatch-name {
+  background: var(--black);
+  color: var(--white);
+  margin: 3px -3px -3px;
+  padding: 3px;
+}
+
+.swatch-hint {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--gray-dark);
+  margin: 0 0 10px;
+}
+
+.swatch-err {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--black);
+  background: var(--off-white);
+  border: 1px solid var(--black);
+  box-shadow: inset 1px 1px 0 var(--gray-light);
+  padding: 4px 9px;
+  margin: 0 0 10px;
+}
+
+.swatch-del {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: var(--black);
+  border: 1px solid var(--white);
+  display: grid;
+  place-items: center;
+}
+
+.swatch-del::before,
+.swatch-del::after {
+  content: '';
+  position: absolute;
+  width: 1.5px;
+  height: 9px;
+  background: var(--white);
+}
+
+.swatch-del::before {
+  transform: rotate(45deg);
+}
+
+.swatch-del::after {
+  transform: rotate(-45deg);
+}
+
+.add-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 130px;
+  cursor: pointer;
+  background: var(--off-white);
+}
+
+/* The add tile's label may wrap; real wallpaper names stay on one line. */
+.add-swatch .swatch-name {
+  white-space: normal;
+  text-align: center;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.add-swatch.drag {
+  outline: 2px dotted var(--black);
+  outline-offset: -4px;
+}
+
+.add-plus {
+  font-family: var(--font-pixel);
+  font-size: 32px;
+  line-height: 1;
+  color: var(--black);
+}
+
+/* Recycle bin rows */
+.trash-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--gray-light);
+}
+
+.trash-row .t-name {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+}
+
+.empty-state {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--gray-dark);
+  line-height: 1.7;
+  padding: 24px 10px;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+/* Folder note */
+.note-area {
+  width: 100%;
+  height: 100%;
+  min-height: 130px;
+  resize: none;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--black);
+  background: var(--white);
+  border: 1px solid var(--black);
+  box-shadow: inset 1px 1px 0 var(--gray-mid);
+  padding: 8px;
+}
+
+.note-area:focus {
+  outline: none;
+  box-shadow:
+    inset 1px 1px 0 var(--gray-mid),
+    0 0 0 1px var(--black);
+}
+
+/* ------------------------------------------------------------
+   Context menu
+   ------------------------------------------------------------ */
+
+.ctx {
+  position: fixed;
+  z-index: 3000;
+  min-width: 190px;
+  background: var(--white);
+  border: 1px solid var(--black);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.92);
+  padding: 2px;
+}
+
+.ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+  background: none;
+  border: none;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.ctx-item:hover,
+.ctx-item:focus {
+  background: var(--black);
+  color: var(--white);
+  outline: none;
+}
+
+.ctx-item:disabled {
+  color: var(--gray-mid);
+  background: none;
+}
+
+.ctx-sep {
+  height: 0;
+  margin: 3px 1px;
+  border-top: 1px solid var(--gray-light);
+  border-bottom: 1px solid var(--gray-dark);
+}
+
+.ctx-item .check {
+  float: right;
+  margin-left: 18px;
+}
+
+/* ------------------------------------------------------------
+   Taskbar
+   ------------------------------------------------------------ */
+
+.taskbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--taskbar-h);
+  z-index: 2500;
+  background: var(--gray-light);
+  border-top: 1px solid var(--black);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+.start-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--black);
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow:
+    inset 1px 1px 0 var(--white),
+    inset -1px -1px 0 var(--gray-dark);
+}
+
+.start-btn.open {
+  box-shadow:
+    inset 1px 1px 0 var(--gray-dark),
+    inset -1px -1px 0 var(--white);
+}
+
+.tabs {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  max-width: 200px;
+  padding: 0 10px 0 5px;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow:
+    inset 1px 1px 0 var(--white),
+    inset -1px -1px 0 var(--gray-dark);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tab .tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab.active {
+  box-shadow:
+    inset 1px 1px 0 var(--gray-dark),
+    inset -1px -1px 0 var(--white);
+  font-weight: 700;
+}
+
+.tray {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+
+.clock {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+  padding: 3px 10px;
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow: inset 1px 1px 0 var(--gray-mid);
+  min-width: 84px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------
+   Start menu
+   ------------------------------------------------------------ */
+
+.start-menu {
+  position: fixed;
+  left: 5px;
+  bottom: calc(var(--taskbar-h) + 4px);
+  z-index: 2600;
+  width: 208px;
+  display: flex;
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow: 4px 4px 0 var(--charcoal);
+}
+
+.start-band {
+  width: 26px;
+  flex: none;
+  background: var(--black);
+  color: var(--off-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  letter-spacing: 2px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.start-items {
+  flex: 1;
+  padding: 3px;
+}
+
+.start-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  color: var(--black);
+  background: none;
+  border: none;
+}
+
+.start-item:hover {
+  background: var(--black);
+  color: var(--white);
+}
+
+.start-sep {
+  height: 0;
+  margin: 4px 2px;
+  border-top: 1px solid var(--gray-light);
+  border-bottom: 1px solid var(--gray-dark);
+}
+
+/* ------------------------------------------------------------
+   Boot + shutdown screens
+   ------------------------------------------------------------ */
+
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: var(--black);
+  color: #d8d8d8;
+  font-family: var(--font-ui);
+  font-size: 21px;
+  line-height: 1.5;
+  padding: 48px 56px;
+  cursor: pointer;
+  white-space: pre;
+}
+
+.boot .cursor {
+  animation: blink 0.9s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.shut-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-ui);
+  font-size: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+}
+
+.shut-dialog {
+  position: fixed;
+  z-index: 5000;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 360px;
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow: 4px 4px 0 var(--charcoal);
+  display: flex;
+  flex-direction: column;
+}
+
+.shut-dialog .body {
+  padding: 16px 14px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.shut-dialog .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--gray-dark);
+}
+
+/* ------------------------------------------------------------
+   Scrollbars — chunky retro
+   ------------------------------------------------------------ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-light) var(--gray-mid);
+}
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-mid);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow:
+    inset 1px 1px 0 var(--white),
+    inset -1px -1px 0 var(--gray-dark);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--gray-mid);
+}
+
+/* ------------------------------------------------------------
+   Responsive + motion
+   ------------------------------------------------------------ */
+
+@media (max-width: 720px) {
+  .tab .tab-label {
+    display: none;
+  }
+  .tab {
+    max-width: 34px;
+    padding: 0 4px;
+  }
+  .start-menu {
+    width: 186px;
+  }
+  .swatch-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
