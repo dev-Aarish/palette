@@ -642,6 +642,8 @@ export default function App() {
           setSelected(null)
           setMenu(null)
           setStartOpen(false)
+          // Clicking the desktop background minimizes the active window.
+          if (activeId) minimizeWin(activeId)
         }
       }}
     >
