@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import type { InspirationTile } from '../types'
 import { coverImage, TILE_IMAGE_W, TILE_IMAGE_H } from '../dither'
 import { DEFAULT_MODEL, describeScreenshot } from '../ai'
@@ -31,11 +31,85 @@ interface Props {
   tiles: InspirationTile[]
   onAdd(tile: Omit<InspirationTile, 'accent'>): void
   onRemove(id: string): void
+  /** Move a tile so it takes the slot of `targetId`, or the end when null. */
+  onReorder(dragId: string, targetId: string | null): void
 }
 
-export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
+/** Sentinel for "dropped on the Add tile" — move the dragged card to the end. */
+const END_DROP = '__end__'
+
+export function InspirationsContent({ tiles, onAdd, onRemove, onReorder }: Props) {
   const [adding, setAdding] = useState(false)
   const [viewing, setViewing] = useState<InspirationTile | null>(null)
+
+  // -------------------------------------------------------------------------
+  // Drag-to-reorder. Pointer events (not HTML5 DnD) so the ghost follows the
+  // cursor smoothly; a real drag suppresses the tile's click-to-open.
+  // -------------------------------------------------------------------------
+  const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const dragRef = useRef<{ id: string; sx: number; sy: number; active: boolean } | null>(null)
+  const overRef = useRef<string | null>(null)
+  const suppressClickRef = useRef(false)
+
+  const startTileDrag = (e: ReactPointerEvent, id: string) => {
+    if (e.button !== 0) return
+    if ((e.target as HTMLElement).closest('.tile-del')) return
+    dragRef.current = { id, sx: e.clientX, sy: e.clientY, active: false }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+
+  const moveTileDrag = (e: ReactPointerEvent) => {
+    const d = dragRef.current
+    if (!d) return
+    if (!d.active) {
+      // Small dead zone so a plain click still opens the tile.
+      if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return
+      d.active = true
+      suppressClickRef.current = true
+      setDrag({ id: d.id, x: e.clientX, y: e.clientY })
+    } else {
+      setDrag((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : prev))
+    }
+    // The tile under the pointer is the drop slot; the Add tile means "end".
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const t = el?.closest<HTMLElement>('.tile, .add-tile')
+    const target = t
+      ? t.classList.contains('add-tile')
+        ? END_DROP
+        : (t.dataset.tileId ?? null)
+      : null
+    if (target === d.id) {
+      overRef.current = null
+      setOverId(null)
+      return
+    }
+    overRef.current = target
+    setOverId(target)
+  }
+
+  const endTileDrag = (commit: boolean) => {
+    const d = dragRef.current
+    dragRef.current = null
+    if (!d?.active) return
+    if (commit) {
+      const target = overRef.current
+      if (target === END_DROP) onReorder(d.id, null)
+      else if (target != null) onReorder(d.id, target)
+    } else {
+      suppressClickRef.current = false
+    }
+    setDrag(null)
+    setOverId(null)
+    overRef.current = null
+    // Browsers fire a click right after this pointerup, retargeted to the
+    // captured tile; that click must not open the tile and consumes the flag
+    // above. If no click arrives (release outside the page, automated input),
+    // clear the flag so a later click isn't silently swallowed.
+    window.setTimeout(() => {
+      suppressClickRef.current = false
+    }, 0)
+  }
 
   // Escape leaves the add form back to the grid.
   useEffect(() => {
@@ -57,6 +131,8 @@ export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [viewing])
 
+  const dragTile = drag ? (tiles.find((t) => t.id === drag.id) ?? null) : null
+
   if (adding) {
     return <AddForm onAdd={onAdd} onCancel={() => setAdding(false)} />
   }
@@ -77,15 +153,42 @@ export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
             key={tile.id}
             tile={tile}
             hero={i % 7 === 0}
-            onOpen={() => setViewing(tile)}
+            dragging={drag?.id === tile.id}
+            dropTarget={overId === tile.id}
+            onOpen={() => {
+              // A click that ends a real drag must not open the tile.
+              if (suppressClickRef.current) {
+                suppressClickRef.current = false
+                return
+              }
+              setViewing(tile)
+            }}
             onRemove={() => onRemove(tile.id)}
+            onPointerDown={startTileDrag}
+            onPointerMove={moveTileDrag}
+            onPointerUp={() => endTileDrag(true)}
+            onPointerCancel={() => endTileDrag(false)}
           />
         ))}
-        <AddTile onAdd={() => setAdding(true)} />
+        <AddTile onAdd={() => setAdding(true)} dropTarget={overId === END_DROP} />
       </div>
+      {drag && dragTile && (
+        <div className="tile-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
+          <div className="tile-art" style={{ background: dragTile.accent }}>
+            {dragTile.image ? (
+              <img src={dragTile.image} alt="" draggable={false} />
+            ) : (
+              <span className="tile-mono">{dragTile.title.slice(0, 1).toUpperCase()}</span>
+            )}
+          </div>
+          <div className="tile-foot">
+            <span className="tile-title">{dragTile.title}</span>
+          </div>
+        </div>
+      )}
       <div className="win-status insp-status">
-        Tiles are yours — add inspirations and they live in this folder. Right-click
-        the desktop → New Folder to add your own folders.
+        Your tiles live in this folder — drag any tile to rearrange the order.
+        Right-click the desktop → New Folder to add your own folders.
       </div>
       {viewing && <TileDetail tile={viewing} onClose={() => setViewing(null)} />}
     </div>
@@ -99,23 +202,36 @@ export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
 function Tile({
   tile,
   hero,
+  dragging,
+  dropTarget,
   onOpen,
   onRemove,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
 }: {
   tile: InspirationTile
   hero: boolean
+  dragging: boolean
+  dropTarget: boolean
   onOpen(): void
   onRemove(): void
+  onPointerDown(e: ReactPointerEvent, id: string): void
+  onPointerMove(e: ReactPointerEvent): void
+  onPointerUp(e: ReactPointerEvent): void
+  onPointerCancel(e: ReactPointerEvent): void
 }) {
   const style = { '--tile-accent': tile.accent } as CSSProperties
   const tip = tile.keywords?.length ? tile.keywords.join(' · ') : undefined
   return (
     <div
-      className={`tile${hero ? ' hero' : ''}`}
+      className={`tile${hero ? ' hero' : ''}${dragging ? ' dragging' : ''}${dropTarget ? ' drop-target' : ''}`}
       style={style}
       title={tip}
       role="button"
       tabIndex={0}
+      data-tile-id={tile.id}
       aria-label={`View ${tile.title}`}
       onClick={onOpen}
       onKeyDown={(e) => {
@@ -124,10 +240,14 @@ function Tile({
           onOpen()
         }
       }}
+      onPointerDown={(e) => onPointerDown(e, tile.id)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
     >
       <div className={`tile-art${tile.image ? '' : ' plain'}`}>
         {tile.image ? (
-          <img src={tile.image} alt={tile.title} />
+          <img src={tile.image} alt={tile.title} draggable={false} />
         ) : (
           <span className="tile-mono">{tile.title.slice(0, 1).toUpperCase()}</span>
         )}
@@ -329,10 +449,10 @@ function TileDetail({ tile, onClose }: { tile: InspirationTile; onClose: () => v
   )
 }
 
-function AddTile({ onAdd }: { onAdd: () => void }) {
+function AddTile({ onAdd, dropTarget }: { onAdd: () => void; dropTarget: boolean }) {
   return (
     <div
-      className="add-tile"
+      className={`add-tile${dropTarget ? ' drop-target' : ''}`}
       role="button"
       tabIndex={0}
       aria-label="Add inspiration"

@@ -511,6 +511,24 @@ export default function App() {
     setIcons((prev) => prev.map((ic) => (ic.id === id ? { ...ic, note } : ic)))
   }
 
+  /** Move a gallery tile so it takes the slot of `targetId` (or the end when null). */
+  const reorderInspiration = (dragId: string, targetId: string | null) => {
+    setInspirations((prev) => {
+      const from = prev.findIndex((t) => t.id === dragId)
+      if (from === -1) return prev
+      const dragged = prev[from]
+      if (targetId == null) {
+        if (from === prev.length - 1) return prev
+        return [...prev.filter((t) => t.id !== dragId), dragged]
+      }
+      const rest = prev.filter((t) => t.id !== dragId)
+      const to = rest.findIndex((t) => t.id === targetId)
+      if (to === -1) return prev
+      rest.splice(to, 0, dragged)
+      return rest
+    })
+  }
+
   // ------------------------------------------------------------------
   // Menus
   // ------------------------------------------------------------------
@@ -577,6 +595,7 @@ export default function App() {
               ])
             }
             onRemove={(id) => setInspirations((prev) => prev.filter((t) => t.id !== id))}
+            onReorder={reorderInspiration}
           />
         )
       case 'wallpaper':

@@ -679,6 +679,72 @@ select.field {
   outline-offset: -3px;
 }
 
+/* --- drag-to-reorder --------------------------------------------------------
+   Tiles rearrange by dragging. The source card dims, the card under the
+   pointer becomes the drop slot, and a fixed ghost follows the cursor.
+   (Placed after .tile:hover/:active so the drop ring wins on specificity.) */
+
+.tile,
+.add-tile {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tile {
+  cursor: grab;
+  touch-action: none;
+}
+
+.tile.dragging {
+  opacity: 0.35;
+  box-shadow: none;
+  cursor: grabbing;
+}
+
+.tile.drop-target,
+.add-tile.drop-target {
+  box-shadow: 3px 3px 0 var(--gray-dark), inset 0 0 0 3px var(--gray-dark);
+  outline: 2px dashed var(--black);
+  outline-offset: -2px;
+}
+
+/* Keep the browser's native image drag from hijacking pointer events. */
+.tile-art img,
+.insp-modal-art img,
+.tile-ghost img {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* The card that follows the pointer mid-drag. */
+.tile-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border: 1px solid var(--black);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  z-index: 5000;
+  transform: translate(-50%, -50%) rotate(-3deg);
+  pointer-events: none;
+}
+
+.tile-ghost .tile-art {
+  flex: 1;
+  min-height: 0;
+}
+
+.tile-ghost .tile-foot {
+  height: 38px;
+  padding: 4px 8px;
+}
+
 .add-plus {
   font-family: var(--font-pixel);
   font-size: 30px;
