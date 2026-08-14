@@ -35,6 +35,7 @@ interface Props {
 
 export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
   const [adding, setAdding] = useState(false)
+  const [viewing, setViewing] = useState<InspirationTile | null>(null)
 
   // Escape leaves the add form back to the grid.
   useEffect(() => {
@@ -45,6 +46,16 @@ export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [adding])
+
+  // Escape closes the tile detail modal.
+  useEffect(() => {
+    if (!viewing) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setViewing(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [viewing])
 
   if (adding) {
     return <AddForm onAdd={onAdd} onCancel={() => setAdding(false)} />
@@ -62,7 +73,13 @@ export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
           </div>
         )}
         {tiles.map((tile, i) => (
-          <Tile key={tile.id} tile={tile} hero={i % 7 === 0} onRemove={() => onRemove(tile.id)} />
+          <Tile
+            key={tile.id}
+            tile={tile}
+            hero={i % 7 === 0}
+            onOpen={() => setViewing(tile)}
+            onRemove={() => onRemove(tile.id)}
+          />
         ))}
         <AddTile onAdd={() => setAdding(true)} />
       </div>
@@ -70,6 +87,7 @@ export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
         Tiles are yours — add inspirations and they live in this folder. Right-click
         the desktop → New Folder to add your own folders.
       </div>
+      {viewing && <TileDetail tile={viewing} onClose={() => setViewing(null)} />}
     </div>
   )
 }
@@ -78,22 +96,234 @@ export function InspirationsContent({ tiles, onAdd, onRemove }: Props) {
 // Gallery tiles
 // ---------------------------------------------------------------------------
 
-function Tile({ tile, hero, onRemove }: { tile: InspirationTile; hero: boolean; onRemove: () => void }) {
+function Tile({
+  tile,
+  hero,
+  onOpen,
+  onRemove,
+}: {
+  tile: InspirationTile
+  hero: boolean
+  onOpen(): void
+  onRemove(): void
+}) {
   const style = { '--tile-accent': tile.accent } as CSSProperties
   const tip = tile.keywords?.length ? tile.keywords.join(' · ') : undefined
   return (
-    <div className={`tile${hero ? ' hero' : ''}`} style={style} title={tip}>
+    <div
+      className={`tile${hero ? ' hero' : ''}`}
+      style={style}
+      title={tip}
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${tile.title}`}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+    >
       <div className={`tile-art${tile.image ? '' : ' plain'}`}>
         {tile.image ? (
           <img src={tile.image} alt={tile.title} />
         ) : (
           <span className="tile-mono">{tile.title.slice(0, 1).toUpperCase()}</span>
         )}
-        <button className="tile-del" aria-label={`Remove ${tile.title}`} onClick={onRemove} />
+        <button
+          className="tile-del"
+          aria-label={`Remove ${tile.title}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
+        />
       </div>
       <div className="tile-foot">
         <span className="tile-title">{tile.title}</span>
         {tile.description && <span className="tile-desc">{tile.description}</span>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tile detail modal — the full story behind one inspiration
+// ---------------------------------------------------------------------------
+
+/**
+ * The two prompts every entry ships, per AGENT.md §4 — synthesized on the fly
+ * from the tile's own vocabulary (description + keywords), so even a bare
+ * title-only tile is copy-paste-ready.
+ */
+
+/** §4.1 — reproduce the look in a single generated image. */
+function buildImageRecipe(tile: InspirationTile): string {
+  const vocab = tile.keywords?.length
+    ? tile.keywords.join(', ')
+    : 'the palette, texture, type and mood that define this language'
+  const premise = tile.description?.trim() || `A design language called "${tile.title}".`
+  const paletteClause = tile.palette?.length
+    ? `STRICT palette — these exact colors only: ${tile.palette.join(' ')}. No other colors.`
+    : 'Palette locked to what the vocabulary implies — no colors outside it.'
+  const typeClause = tile.typography
+    ? `Typography: ${tile.typography}`
+    : 'Type treatment matching the language above.'
+  return [
+    `Image Recipe — ${tile.title}`,
+    '',
+    'Target: Higgsfield gpt_image_2 @ 2K',
+    '',
+    `[SUBJECT], rendered in the "${tile.title}" design language:`,
+    premise,
+    '',
+    'Lock the style signature to exactly this vocabulary — nothing else:',
+    `${vocab}.`,
+    paletteClause,
+    typeClause,
+    'Soft even studio light, isolated on a clean white ground with generous',
+    'empty space above for type.',
+  ].join('\n')
+}
+
+/** §4.2 — a self-contained brief for building an entire site in the language. */
+function buildCopyBrief(tile: InspirationTile): string {
+  const vocab = tile.keywords ?? []
+  const premise = tile.description?.trim() || `A design language called "${tile.title}".`
+  const lines = [
+    `Copy Brief — ${tile.title}`,
+    '',
+    `Build an entire website in the "${tile.title}" design language. This brief`,
+    'is self-contained — do not ask for the reference image.',
+    '',
+    `Premise: ${premise}`,
+  ]
+  if (tile.palette?.length) {
+    lines.push('', 'Palette (use these exact hex values, nothing else):')
+    for (const c of tile.palette) lines.push(`  • ${c}`)
+  }
+  if (tile.typography) {
+    lines.push('', `Typography: ${tile.typography}`)
+  }
+  if (vocab.length) {
+    lines.push('', 'Visual vocabulary — pull every design decision from these, and only these:')
+    for (const k of vocab) lines.push(`  • ${k}`)
+  }
+  lines.push(
+    '',
+    'Build it out as a complete, coherent site:',
+    '  • Structure — a layout and composition logic that fits the language.',
+    '  • Copy tone — write in the register this language calls for, with sample microcopy.',
+    '  • Mood — the emotional register, held consistent on every page.',
+  )
+  return lines.join('\n')
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
+
+function TileDetail({ tile, onClose }: { tile: InspirationTile; onClose: () => void }) {
+  const style = { '--tile-accent': tile.accent } as CSSProperties
+  const [copied, setCopied] = useState<'recipe' | 'brief' | null>(null)
+  const timer = useRef<number | undefined>(undefined)
+
+  const copy = async (which: 'recipe' | 'brief') => {
+    const text = which === 'recipe' ? buildImageRecipe(tile) : buildCopyBrief(tile)
+    if (!(await copyText(text))) return
+    setCopied(which)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setCopied(null), 1600)
+  }
+
+  return (
+    <div className="insp-modal-backdrop" onClick={onClose}>
+      <div
+        className="insp-modal"
+        style={style}
+        role="dialog"
+        aria-modal="true"
+        aria-label={tile.title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="insp-modal-head">
+          <span className="insp-modal-title">{tile.title}</span>
+          <button
+            className="tile-del insp-modal-close"
+            aria-label={`Close ${tile.title}`}
+            onClick={onClose}
+          />
+        </header>
+        <div className={`insp-modal-art${tile.image ? '' : ' plain'}`}>
+          {tile.image ? (
+            <img src={tile.image} alt={tile.title} />
+          ) : (
+            <span className="insp-modal-mono">{tile.title.slice(0, 1).toUpperCase()}</span>
+          )}
+        </div>
+        <div className="insp-modal-body">
+          {tile.description ? (
+            <p className="insp-modal-desc">{tile.description}</p>
+          ) : (
+            <p className="insp-modal-desc muted">
+              No description yet — this tile is just a name for now.
+            </p>
+          )}
+          {tile.palette?.length ? (
+            <div className="palette-row" aria-label="Palette">
+              {tile.palette.map((c) => (
+                <span key={c} className="palette-item">
+                  <span className="palette-chip" style={{ background: c }} />
+                  <span className="palette-hex">{c}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {tile.typography ? <p className="insp-modal-type">{tile.typography}</p> : null}
+          {tile.keywords?.length ? (
+            <div className="chip-row">
+              {tile.keywords.map((k) => (
+                <span key={k} className="chip">
+                  {k}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <footer className="insp-modal-actions">
+          <button
+            className={`btn${copied === 'recipe' ? ' copied' : ''}`}
+            onClick={() => copy('recipe')}
+            title="Reproduce this design language in one generated image — copies a ready-to-paste prompt."
+          >
+            {copied === 'recipe' ? 'Copied ✓' : 'Image Recipe'}
+          </button>
+          <button
+            className={`btn${copied === 'brief' ? ' copied' : ''}`}
+            onClick={() => copy('brief')}
+            title="A self-contained brief for building an entire site in this design language — copies it."
+          >
+            {copied === 'brief' ? 'Copied ✓' : 'Copy Brief'}
+          </button>
+        </footer>
       </div>
     </div>
   )
@@ -136,6 +366,8 @@ function AddForm({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [keywords, setKeywords] = useState('')
+  const [palette, setPalette] = useState<string[]>([])
+  const [typography, setTypography] = useState('')
   const [image, setImage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [aiKey, setAiKey] = useState(() => loadStr('palette.aiKey', ''))
@@ -171,6 +403,8 @@ function AddForm({
       if (draft.title) setTitle(draft.title)
       if (draft.description) setDescription(draft.description)
       if (draft.keywords.length) setKeywords(draft.keywords.join(', '))
+      if (draft.palette?.length) setPalette(draft.palette)
+      if (draft.typography) setTypography(draft.typography)
       saveStr('palette.aiKey', aiKey.trim())
       saveStr('palette.aiModel', aiModel.trim() || DEFAULT_MODEL)
     } catch (e) {
@@ -195,6 +429,8 @@ function AddForm({
       image,
       description: description.trim() || undefined,
       keywords: keywordList.length ? keywordList : undefined,
+      palette: palette.length ? palette : undefined,
+      typography: typography.trim() || undefined,
     })
     onCancel()
   }
@@ -310,7 +546,7 @@ function AddForm({
         </div>
         <span className="ai-hint">
           {image
-            ? 'The AI looks at your screenshot and drafts the title, description and keywords — free on OpenRouter. It picks a working free vision model automatically.'
+            ? 'The AI looks at your screenshot and drafts the title, description, keywords, an exact hex palette and the typography — free on OpenRouter. It picks a working free vision model automatically.'
             : 'Add an image above and the AI can describe it for you.'}
         </span>
         {aiError && <span className="ai-err">{aiError}</span>}

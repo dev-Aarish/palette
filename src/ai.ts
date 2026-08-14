@@ -15,6 +15,10 @@ export interface TileDraft {
   title: string
   description: string
   keywords: string[]
+  /** Exact hex colours read off the screenshot. */
+  palette?: string[]
+  /** One sentence naming the type treatment. */
+  typography?: string
 }
 
 /** A good, currently-live default (checked against the API at runtime too). */
@@ -35,7 +39,13 @@ Return ONLY a JSON object with exactly these fields:
   company, and never repeat the page's own marketing copy.
 - "keywords": 4 to 6 short composable phrases (2-4 words each) naming the
   visual vocabulary: palette, texture, type, layout, mood. Example:
-  ["warm paper ground", "halftone CMYK dots", "mono coordinate callouts"].`
+  ["warm paper ground", "halftone CMYK dots", "mono coordinate callouts"].
+- "palette": an array of 4 to 6 hex color codes ("#RRGGBB") for the dominant
+  colors actually present in the image — read them off the screenshot, do not
+  invent or approximate them.
+- "typography": one sentence on the type treatment — name specific font
+  families if you can identify them, otherwise the closest concrete category
+  (e.g. "bold condensed grotesque sans for headlines over light serif body").`
 
 // ---------------------------------------------------------------------------
 // Live model discovery
@@ -128,10 +138,17 @@ function extractJson(text: string): TileDraft {
         .filter(Boolean)
         .slice(0, 8)
     : []
+  const palette = Array.isArray(obj.palette)
+    ? obj.palette
+        .map((c) => String(c).trim())
+        .filter((c) => /^#[0-9a-fA-F]{3,8}$/.test(c))
+        .slice(0, 8)
+    : []
+  const typography = String(obj.typography ?? '').trim() || undefined
   if (!title && !description) {
     throw new Error('The AI response was missing its content — try again.')
   }
-  return { title, description, keywords }
+  return { title, description, keywords, palette, typography }
 }
 
 async function callOnce(imageDataUrl: string, apiKey: string, model: string): Promise<TileDraft> {
@@ -154,7 +171,7 @@ async function callOnce(imageDataUrl: string, apiKey: string, model: string): Pr
           ],
         },
       ],
-      max_tokens: 500,
+      max_tokens: 800,
     }),
   })
 

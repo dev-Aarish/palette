@@ -84,4 +84,8 @@ export interface InspirationTile {
   description?: string
   /** Optional AI-drafted vocabulary tags. */
   keywords?: string[]
+  /** Exact hex colours extracted from the screenshot by the AI. */
+  palette?: string[]
+  /** One sentence on the typefaces the design uses. */
+  typography?: string
 }

@@ -519,6 +519,17 @@ select.field {
   border: 1px solid var(--black);
   box-shadow: 3px 3px 0 var(--charcoal);
   overflow: hidden;
+  cursor: pointer;
+}
+
+.tile:hover {
+  box-shadow: 3px 3px 0 var(--gray-dark);
+}
+
+.tile:active {
+  box-shadow:
+    inset 1px 1px 0 var(--gray-dark),
+    inset -1px -1px 0 var(--white);
 }
 
 /* Every seventh tile is a bento hero — a 2x2 block. */
@@ -682,6 +693,196 @@ select.field {
 
 .insp-status {
   flex: none;
+}
+
+/* --- tile detail modal ------------------------------------------------------
+   Clicking a tile opens its full story: the screenshot large, the
+   AI-drafted description, and the keyword chips. A fixed overlay so it
+   floats above every window, styled like the rest of the OS but keeping
+   the tile's accent colour. */
+
+.insp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.insp-modal {
+  width: min(540px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--gray-light);
+  border: 1px solid var(--black);
+  box-shadow: 4px 4px 0 var(--charcoal);
+  overflow: hidden;
+}
+
+.insp-modal-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  background: var(--tile-accent);
+  border-bottom: 1px solid var(--black);
+}
+
+.insp-modal-title {
+  flex: 1;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  line-height: 1.3;
+  color: var(--white);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Reuse the tile's X glyph, but pinned inside the header and always visible. */
+.insp-modal-close {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: 18px;
+  height: 18px;
+  opacity: 1;
+}
+
+.insp-modal-art {
+  position: relative;
+  flex: none;
+  background: var(--black);
+  aspect-ratio: 8 / 5;
+}
+
+.insp-modal-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Title-only tiles: the accent field with a dot screen and a big initial. */
+.insp-modal-art.plain {
+  background: var(--tile-accent);
+}
+
+.insp-modal-art.plain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.24) 1.2px, transparent 1.6px);
+  background-size: 6px 6px;
+  pointer-events: none;
+}
+
+.insp-modal-mono {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-pixel);
+  font-size: 72px;
+  line-height: 1;
+  color: var(--white);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.insp-modal-body {
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insp-modal-desc {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--black);
+  white-space: pre-wrap;
+}
+
+.insp-modal-desc.muted {
+  color: var(--gray-dark);
+}
+
+/* Exact hex palette + typography line, extracted from the screenshot by the
+   AI — so the prompts aren't just vague vocabulary, they carry the real
+   colors and type treatment. */
+.palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.palette-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.palette-chip {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--black);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.35),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.palette-hex {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--gray-dark);
+}
+
+.insp-modal-type {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--black);
+}
+
+.insp-modal-body .chip-row {
+  margin-top: auto;
+}
+
+.insp-modal-actions {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--gray-dark);
+  background: var(--gray-mid);
+}
+
+.insp-modal-actions .btn {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The "Copied ✓" confirmation state for the two prompt buttons. */
+.btn.copied {
+  background: var(--black);
+  color: var(--white);
+  box-shadow:
+    inset 1px 1px 0 var(--gray-dark),
+    inset -1px -1px 0 var(--gray-light);
 }
 
 /* --- add-tile form -------------------------------------------------------- */
