@@ -72,11 +72,16 @@ export interface UserWallpaper {
   dataUrl: string
 }
 
-export interface InspirationEntry {
+/** One user-added tile in the Inspirations bento gallery. */
+export interface InspirationTile {
   id: string
   title: string
-  subtitle: string
-  category: string
-  definition: string
-  keywords: string[]
+  /** Downscaled inspiration screenshot (data URL) — null for title-only tiles. */
+  image: string | null
+  /** Accent colour (hex) assigned when the tile is created. */
+  accent: string
+  /** Optional AI-drafted description of the design language. */
+  description?: string
+  /** Optional AI-drafted vocabulary tags. */
+  keywords?: string[]
 }

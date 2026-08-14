@@ -4,13 +4,14 @@ import type {
   DesktopIcon,
   DitherMethod,
   IconKind,
+  InspirationTile,
   TrashItem,
   UserWallpaper,
   WallpaperId,
   WinContent,
   WinState,
 } from './types'
-import { defaultIcons } from './data'
+import { ACCENTS, defaultIcons } from './data'
 import { downscaleImage, renderWallpaper } from './dither'
 import { playDeleteSound, playEmptyBinSound } from './sound'
 
@@ -22,10 +23,10 @@ import { Taskbar } from './components/Taskbar'
 import { StartMenu } from './components/StartMenu'
 import type { StartItem } from './components/StartMenu'
 import { Boot, ShutDownDialog, ShutDownScreen } from './components/screens'
+import { InspirationsContent } from './components/Inspirations'
 import {
   AboutContent,
   FolderContent,
-  InspirationsContent,
   ReadmeContent,
   RecycleContent,
   WallpaperContent,
@@ -52,7 +53,7 @@ function save<T>(key: string, value: T): void {
 
 const SYSTEM_SIZES: Record<Exclude<WinContent, 'folder'>, { w: number; h: number }> = {
   about: { w: 540, h: 470 },
-  inspirations: { w: 660, h: 470 },
+  inspirations: { w: 740, h: 560 },
   wallpaper: { w: 540, h: 460 },
   recycle: { w: 460, h: 360 },
   readme: { w: 560, h: 450 },
@@ -87,6 +88,7 @@ export default function App() {
   const [booted, setBooted] = useState(() => sessionStorage.getItem('palette.booted') === '1')
   const [icons, setIcons] = useState<DesktopIcon[]>(() => load('palette.icons', defaultIcons()))
   const [trash, setTrash] = useState<TrashItem[]>(() => load('palette.trash', []))
+  const [inspirations, setInspirations] = useState<InspirationTile[]>(() => load('palette.inspirations', []))
   const [wins, setWins] = useState<WinState[]>([])
   const [userWallpapers, setUserWallpapers] = useState<UserWallpaper[]>(() => load('palette.userWallpapers', []))
   const [wallpaper, setWallpaper] = useState<WallpaperId>(() => {
@@ -117,6 +119,10 @@ export default function App() {
     const t = setTimeout(() => save('palette.trash', trash), 250)
     return () => clearTimeout(t)
   }, [trash])
+  useEffect(() => {
+    const t = setTimeout(() => save('palette.inspirations', inspirations), 250)
+    return () => clearTimeout(t)
+  }, [inspirations])
   useEffect(() => save('palette.wallpaper', wallpaper), [wallpaper])
   useEffect(() => save('palette.dither', dither), [dither])
   useEffect(() => save('palette.photoColor', photoColor), [photoColor])
@@ -426,7 +432,18 @@ export default function App() {
       case 'about':
         return <AboutContent />
       case 'inspirations':
-        return <InspirationsContent />
+        return (
+          <InspirationsContent
+            tiles={inspirations}
+            onAdd={(tile) =>
+              setInspirations((prev) => [
+                ...prev,
+                { ...tile, accent: ACCENTS[prev.length % ACCENTS.length] },
+              ])
+            }
+            onRemove={(id) => setInspirations((prev) => prev.filter((t) => t.id !== id))}
+          />
+        )
       case 'wallpaper':
         return (
           <WallpaperContent

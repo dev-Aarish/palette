@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DitherMethod, DesktopIcon, TrashItem, UserWallpaper, WallpaperId } from '../types'
-import { INSPIRATIONS, README_TEXT, WALLPAPERS } from '../data'
+import { README_TEXT, WALLPAPERS } from '../data'
 import { renderWallpaper } from '../dither'
 import { PixelIcon } from '../icons'
 
@@ -44,49 +44,6 @@ export function AboutContent() {
         <span className="chip">Dither Mono</span>
         <span className="chip">1-bit</span>
         <span className="chip">live</span>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Inspirations — the library's taxonomy, two-pane explorer
-// ---------------------------------------------------------------------------
-
-export function InspirationsContent() {
-  const [sel, setSel] = useState(0)
-  const entry = INSPIRATIONS[sel]
-
-  return (
-    <div className="split">
-      <div className="list-pane">
-        {INSPIRATIONS.map((it, i) => (
-          <button
-            key={it.id}
-            className={`entry-row${i === sel ? ' active' : ''}`}
-            onClick={() => setSel(i)}
-          >
-            <PixelIcon kind="folder" size={16} />
-            {it.title}
-          </button>
-        ))}
-      </div>
-      <div className="detail-pane">
-        <div className="detail-title">{entry.title}</div>
-        <div className="detail-sub">{entry.subtitle}</div>
-        <p className="detail-body">{entry.definition}</p>
-        <div className="win-status">vocabulary</div>
-        <div className="chip-row">
-          {entry.keywords.map((k) => (
-            <span key={k} className="chip">
-              {k}
-            </span>
-          ))}
-        </div>
-        <div className="win-status" style={{ marginTop: 6 }}>
-          Entries are library content. Right-click the desktop → New Folder to
-          add your own.
-        </div>
       </div>
     </div>
   )
