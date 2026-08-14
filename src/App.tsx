@@ -12,7 +12,14 @@ import type {
   WinState,
 } from './types'
 import { ACCENTS, defaultIcons } from './data'
-import { downscaleImage, renderWallpaper } from './dither'
+import {
+  coverImage,
+  downscaleImage,
+  loadImage,
+  renderWallpaper,
+  TILE_IMAGE_H,
+  TILE_IMAGE_W,
+} from './dither'
 import { playDeleteSound, playEmptyBinSound } from './sound'
 
 import { DesktopIcon as DesktopIconView } from './components/DesktopIcon'
@@ -160,6 +167,43 @@ export default function App() {
     const t = setTimeout(() => save('palette.inspirations', inspirations), 250)
     return () => clearTimeout(t)
   }, [inspirations])
+
+  // One-time migration: tiles uploaded before the fixed-size crop existed kept
+  // their original dimensions, so each card cropped differently. Re-run every
+  // stored tile image through the same fixed-size crop once, then mark the
+  // migration done so it never scans the library again.
+  useEffect(() => {
+    if (load('palette.inspNorm', false)) return
+    let cancelled = false
+    ;(async () => {
+      const tiles = load<InspirationTile[]>('palette.inspirations', [])
+      const out: InspirationTile[] = []
+      let changed = false
+      for (const t of tiles) {
+        if (!t.image) {
+          out.push(t)
+          continue
+        }
+        try {
+          const img = await loadImage(t.image)
+          if (img.naturalWidth === TILE_IMAGE_W && img.naturalHeight === TILE_IMAGE_H) {
+            out.push(t)
+          } else {
+            out.push({ ...t, image: await coverImage(t.image, TILE_IMAGE_W, TILE_IMAGE_H) })
+            changed = true
+          }
+        } catch {
+          // Unreadable image — keep the tile as it was.
+          out.push(t)
+        }
+      }
+      if (!cancelled && changed) setInspirations(out)
+      if (!cancelled) save('palette.inspNorm', true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Remember the Inspirations window's size/position/maximized state as it
   // is dragged, resized or maximized, so the folder reopens as it was left.

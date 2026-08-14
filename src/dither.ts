@@ -326,6 +326,14 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
+/**
+ * Standard inspiration tile image size. Every uploaded screenshot is
+ * normalized to exactly this (center-cropped) before it is stored, so all
+ * tiles show the same-size image with the same crop.
+ */
+export const TILE_IMAGE_W = 1024
+export const TILE_IMAGE_H = 600
+
 /** Downscale an image data URL to at most maxEdge pixels on the long edge. */
 export async function downscaleImage(dataUrl: string, maxEdge = 1024): Promise<string> {
   const img = await loadImage(dataUrl)
@@ -338,6 +346,27 @@ export async function downscaleImage(dataUrl: string, maxEdge = 1024): Promise<s
   const ctx = c.getContext('2d')
   if (!ctx) return dataUrl
   ctx.drawImage(img, 0, 0, w, h)
+  return c.toDataURL('image/jpeg', 0.85)
+}
+
+/**
+ * Resize an image to an exact fixed dimension, expanding or shrinking it and
+ * center-cropping so it always fills the canvas (cover-fit). Used for
+ * inspiration tiles so every card's image is the same size and shows the same
+ * crop, no matter what dimensions the uploaded photo had.
+ */
+export async function coverImage(dataUrl: string, w: number, h: number): Promise<string> {
+  const img = await loadImage(dataUrl)
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const ctx = c.getContext('2d')
+  if (!ctx) return dataUrl
+  // Scale up or down so the image covers the canvas, then center the excess.
+  const scale = Math.max(w / img.width, h / img.height)
+  const dw = img.width * scale
+  const dh = img.height * scale
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh)
   return c.toDataURL('image/jpeg', 0.85)
 }
 

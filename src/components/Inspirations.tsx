@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { InspirationTile } from '../types'
-import { downscaleImage } from '../dither'
+import { coverImage, TILE_IMAGE_W, TILE_IMAGE_H } from '../dither'
 import { DEFAULT_MODEL, describeScreenshot } from '../ai'
 
 /**
@@ -154,7 +154,7 @@ function AddForm({
         r.onerror = () => reject(r.error ?? new Error('Could not read file'))
         r.readAsDataURL(file)
       })
-      setImage(await downscaleImage(dataUrl, 1024))
+      setImage(await coverImage(dataUrl, TILE_IMAGE_W, TILE_IMAGE_H))
     } catch {
       /* unreadable image — keep whatever preview was there */
     } finally {
