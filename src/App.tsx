@@ -59,18 +59,55 @@ const SYSTEM_SIZES: Record<Exclude<WinContent, 'folder'>, { w: number; h: number
   readme: { w: 560, h: 450 },
 }
 
+interface Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+  /** True if the window was maximized when last closed — reopen maximized. */
+  maximized?: boolean
+}
+
+const INSP_RECT_KEY = 'palette.inspRect'
+
+function loadInspRect(): Rect | null {
+  return load<Rect | null>(INSP_RECT_KEY, null)
+}
+
 function systemWindow(content: Exclude<WinContent, 'folder'>): {
   id: string
   title: string
   kind: IconKind
   w: number
   h: number
+  x?: number
+  y?: number
+  maximized?: boolean
 } {
   switch (content) {
     case 'about':
       return { id: 'sys:about', title: 'About Me', kind: 'person', ...SYSTEM_SIZES.about }
-    case 'inspirations':
-      return { id: 'sys:inspirations', title: 'Inspirations', kind: 'folder', ...SYSTEM_SIZES.inspirations }
+    case 'inspirations': {
+      // Reopen where the user left it: size, position and maximized state.
+      const r = loadInspRect()
+      const base = SYSTEM_SIZES.inspirations
+      const vw = window.innerWidth
+      const vh = window.innerHeight - TASKBAR_H
+      const w = r ? clamp(r.w, 300, vw - 10) : base.w
+      const h = r ? clamp(r.h, 180, vh - 10) : base.h
+      const x = r ? clamp(r.x, 6, Math.max(6, vw - w - 10)) : undefined
+      const y = r ? clamp(r.y, 4, Math.max(4, vh - h - 4)) : undefined
+      return {
+        id: 'sys:inspirations',
+        title: 'Inspirations',
+        kind: 'folder',
+        w,
+        h,
+        x,
+        y,
+        maximized: r?.maximized ?? false,
+      }
+    }
     case 'wallpaper':
       return { id: 'sys:wallpaper', title: 'Change Wallpaper', kind: 'picture', ...SYSTEM_SIZES.wallpaper }
     case 'recycle':
@@ -123,6 +160,25 @@ export default function App() {
     const t = setTimeout(() => save('palette.inspirations', inspirations), 250)
     return () => clearTimeout(t)
   }, [inspirations])
+
+  // Remember the Inspirations window's size/position/maximized state as it
+  // is dragged, resized or maximized, so the folder reopens as it was left.
+  const inspWin = wins.find((w) => w.id === 'sys:inspirations')
+  useEffect(() => {
+    if (!inspWin) return
+    const t = setTimeout(
+      () =>
+        save(INSP_RECT_KEY, {
+          x: inspWin.x,
+          y: inspWin.y,
+          w: inspWin.w,
+          h: inspWin.h,
+          maximized: inspWin.maximized,
+        }),
+      250,
+    )
+    return () => clearTimeout(t)
+  }, [inspWin?.x, inspWin?.y, inspWin?.w, inspWin?.h, inspWin?.maximized])
   useEffect(() => save('palette.wallpaper', wallpaper), [wallpaper])
   useEffect(() => save('palette.dither', dither), [dither])
   useEffect(() => save('palette.photoColor', photoColor), [photoColor])
@@ -217,6 +273,7 @@ export default function App() {
     w: number,
     h: number,
     folderIconId?: string,
+    init?: { x?: number; y?: number; maximized?: boolean },
   ) => {
     setMenu(null)
     setStartOpen(false)
@@ -230,11 +287,33 @@ export default function App() {
       const vw = window.innerWidth
       const vh = window.innerHeight - TASKBAR_H
       const cascade = prev.length * 26
-      const x = clamp(Math.round((vw - w) / 2 - 70 + cascade), 6, Math.max(6, vw - w - 10))
-      const y = clamp(Math.round((vh - h) / 3 + cascade * 0.8), 4, Math.max(4, vh - h - 4))
+      const x = init?.x !== undefined
+        ? clamp(init.x, 6, Math.max(6, vw - w - 10))
+        : clamp(Math.round((vw - w) / 2 - 70 + cascade), 6, Math.max(6, vw - w - 10))
+      const y = init?.y !== undefined
+        ? clamp(init.y, 4, Math.max(4, vh - h - 4))
+        : clamp(Math.round((vh - h) / 3 + cascade * 0.8), 4, Math.max(4, vh - h - 4))
       return [
         ...prev,
-        { id, content, title, kind, x, y, w, h, z: ++zRef.current, minimized: false, maximized: false, folderIconId },
+        {
+          id,
+          content,
+          title,
+          kind,
+          x,
+          y,
+          w,
+          h,
+          z: ++zRef.current,
+          minimized: false,
+          maximized: init?.maximized ?? false,
+          // Remember the pre-maximize rect so un-maximizing returns there.
+          savedRect:
+            init?.maximized && init.x !== undefined && init.y !== undefined
+              ? { x, y, w, h }
+              : undefined,
+          folderIconId,
+        },
       ]
     })
   }
@@ -245,12 +324,20 @@ export default function App() {
       return
     }
     const sw = systemWindow(icon.type)
-    openWindow(sw.id, icon.type, sw.title, sw.kind, sw.w, sw.h)
+    const init =
+      sw.x !== undefined && sw.y !== undefined
+        ? { x: sw.x, y: sw.y, maximized: sw.maximized ?? false }
+        : undefined
+    openWindow(sw.id, icon.type, sw.title, sw.kind, sw.w, sw.h, undefined, init)
   }
 
   const openSystem = (content: Exclude<WinContent, 'folder'>) => {
     const sw = systemWindow(content)
-    openWindow(sw.id, content, sw.title, sw.kind, sw.w, sw.h)
+    const init =
+      sw.x !== undefined && sw.y !== undefined
+        ? { x: sw.x, y: sw.y, maximized: sw.maximized ?? false }
+        : undefined
+    openWindow(sw.id, content, sw.title, sw.kind, sw.w, sw.h, undefined, init)
   }
 
   const focusWin = (id: string) => {
@@ -258,7 +345,11 @@ export default function App() {
   }
 
   const closeWin = (id: string) => {
-    setWins((prev) => prev.filter((w) => w.id !== id))
+    const w = wins.find((wn) => wn.id === id)
+    if (id === 'sys:inspirations' && w) {
+      save(INSP_RECT_KEY, { x: w.x, y: w.y, w: w.w, h: w.h, maximized: w.maximized })
+    }
+    setWins((prev) => prev.filter((wn) => wn.id !== id))
   }
 
   const minimizeWin = (id: string) => {
