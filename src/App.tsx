@@ -21,6 +21,7 @@ import {
   TILE_IMAGE_W,
 } from './dither'
 import { playDeleteSound, playEmptyBinSound } from './sound'
+import { saveCloud, subscribeCloud } from './firebase'
 
 import { DesktopIcon as DesktopIconView } from './components/DesktopIcon'
 import { Window } from './components/Window'
@@ -154,19 +155,66 @@ export default function App() {
   const [flash, setFlash] = useState(false)
   const zRef = useRef(20)
 
-  // Debounced persistence
+  // Cloud sync keeps localStorage as the source of truth but mirrors the tile
+  // array up to Firestore under {uid}. `localStampRef` records when the local
+  // version last changed; a cloud version strictly newer than it is folded back
+  // in (last-write-wins by timestamp, so edits never ping-pong).
+  const localStampRef = useRef<number>(load('palette.inspStamp', 0))
+
+  // Skip the very first (boot-time) run of the persist effect. Otherwise an
+  // app that opens with an empty library would silently upload an empty
+  // `{ tiles: [], updatedAt }` doc, which is exactly the empty doc seen above.
+  const bootRef = useRef(true)
+
+  // Debounced persistence + cloud mirror. localStorage always receives the
+  // change; the cloud write is fire-and-forget so an offline desktop never
+  // blocks an edit.
   useEffect(() => {
-    const t = setTimeout(() => save('palette.icons', icons), 250)
-    return () => clearTimeout(t)
-  }, [icons])
-  useEffect(() => {
-    const t = setTimeout(() => save('palette.trash', trash), 250)
-    return () => clearTimeout(t)
-  }, [trash])
-  useEffect(() => {
-    const t = setTimeout(() => save('palette.inspirations', inspirations), 250)
+    const t = setTimeout(() => {
+      if (bootRef.current) {
+        bootRef.current = false
+        return
+      }
+      save('palette.inspirations', inspirations)
+      localStampRef.current = Date.now()
+      save('palette.inspStamp', localStampRef.current)
+      void saveCloud({ tiles: inspirations, updatedAt: localStampRef.current })
+    }, 250)
     return () => clearTimeout(t)
   }, [inspirations])
+
+  // Connect to Firestore and fold any newer cloud state back down once.
+  useEffect(() => {
+    let cancelled = false
+    let unsub: (() => void) | null = null
+    ;(async () => {
+      unsub = await subscribeCloud((cloud) => {
+        if (cancelled) return
+        const localStamp = localStampRef.current
+        if (cloud == null) {
+          // No cloud doc yet — seed it with whatever we have locally.
+          const local = load<InspirationTile[]>('palette.inspirations', [])
+          if (local.length) {
+            const stamp = Date.now()
+            localStampRef.current = stamp
+            save('palette.inspStamp', stamp)
+            void saveCloud({ tiles: local, updatedAt: stamp })
+          }
+          return
+        }
+        if (cloud.updatedAt > localStamp) {
+          localStampRef.current = cloud.updatedAt
+          save('palette.inspStamp', cloud.updatedAt)
+          save('palette.inspirations', cloud.tiles)
+          setInspirations(cloud.tiles)
+        }
+      })
+    })()
+    return () => {
+      cancelled = true
+      unsub?.()
+    }
+  }, [])
 
   // One-time migration: tiles uploaded before the fixed-size crop existed kept
   // their original dimensions, so each card cropped differently. Re-run every
