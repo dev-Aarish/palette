@@ -472,11 +472,7 @@ select.field {
   gap: 8px;
   height: 100%;
   min-height: 0;
-  background:
-    radial-gradient(120% 90% at 6% 0%, #ffe2cf 0%, transparent 55%),
-    radial-gradient(120% 90% at 96% 10%, #d5ebff 0%, transparent 55%),
-    radial-gradient(130% 110% at 50% 112%, #f0d9ff 0%, transparent 60%),
-    var(--off-white);
+  background: var(--off-white);
 }
 
 .gallery-grid {
