@@ -487,7 +487,11 @@ select.field {
   grid-auto-flow: dense;
   gap: 12px;
   overflow-y: auto;
+  scrollbar-width: none;
   padding: 4px;
+}
+.gallery-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .empty-library {
