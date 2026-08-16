@@ -483,13 +483,15 @@ select.field {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 200px));
-  /* Fixed card height — rows never stretch to fill the folder window, so
-     tiles stay uniform rectangles instead of ballooning to the bottom. */
-  grid-auto-rows: 150px;
-  gap: 10px;
+  /* Auto-fit with minmax(240px, 1fr) stretches cards across the full folder width,
+     eliminating empty dead space on the right while making cards larger and easier to read. */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* Proportional card height — 240px per cell gives clear previews and hero scaling. */
+  grid-auto-rows: 240px;
+  grid-auto-flow: dense;
+  gap: 12px;
   overflow-y: auto;
-  padding: 2px;
+  padding: 4px;
 }
 
 .empty-library {
@@ -722,8 +724,8 @@ select.field {
   position: fixed;
   left: 0;
   top: 0;
-  width: 150px;
-  height: 150px;
+  width: 240px;
+  height: 240px;
   display: flex;
   flex-direction: column;
   background: var(--white);
@@ -741,7 +743,7 @@ select.field {
 }
 
 .tile-ghost .tile-foot {
-  height: 38px;
+  height: 44px;
   padding: 4px 8px;
 }
 
